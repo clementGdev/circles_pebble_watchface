@@ -20,7 +20,7 @@
     "shortName": "CIRCLES",
     "uuid": "33f029d2-f780-4f01-b6fd-a8f2b84ca1ab",
     "versionCode": 1,
-    "versionLabel": "2.2",
+    "versionLabel": "2.3",
     "watchapp": {
         "watchface": true
     }

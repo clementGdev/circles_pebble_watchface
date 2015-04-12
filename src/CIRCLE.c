@@ -1,12 +1,10 @@
 /************************************************************************/
 /* This is a Pebble Watchface Made By Clement Guillou					*/
-/* Date : 02/03/15														*/
+/* Date : 12/04/15														*/
 /*																		*/
-/* Version : 1.1														*/
-/* Version note : 	first release, app icon								*/
+/* Version : 2.3														*/
+/* Version note : 	animation on time change and startup				*/
 /* 																		*/
-/* TODO : Animations, Settings, color support for pebble time			*/
-/* COMMENT THE CODE !!!!!												*/
 /*																		*/
 /* 							2.9 SDK										*/
 /************************************************************************/
@@ -15,7 +13,6 @@
 
 // TODO :
 //			Get rid of the text layer (App crashes without it ?)
-// 			Animations (Almost done)
 // 			Settings with js
 //			Define constants for easier changes in the config.h file
 //			All values must be replaced by a const in the code
