@@ -18,7 +18,7 @@
 // 			Animations (Almost done)
 // 			Settings with js
 //			Define constants for easier changes in the config.h file
-//				All values must be replaced by a const in the code
+//			All values must be replaced by a const in the code
 
 /*
  Animations :
