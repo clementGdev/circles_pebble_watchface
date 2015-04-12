@@ -52,7 +52,8 @@
  
  On Shutdown
  ___________
- If it's possible, do a reverse startup animation when the app is shut down
+Nothing like that can be done in the deinit process...
+
 */
 
 //////////////////////////////////////////////////////////////
