@@ -15,7 +15,6 @@
 
 
 // TODO :
-// 			Get rid of bitmap layers (between macro definitions)
 //			Get rid of the text layer (App crashes without it ?)
 // 			Animations (Almost done)
 // 			Color selection (Settings with js)
@@ -60,7 +59,7 @@
 
 
 #include <pebble.h>
-#include "color_definition.h"
+//#include "color_definition.h"
 #include "config.h"
 
 
@@ -89,13 +88,6 @@ static const GPathInfo BOLT_PATH_INFO = {
 	.points = (GPoint []) {{-7, -7}, {7, -7}, {7, 7} , {-7, 7}}
 };
 
-#ifdef ROT_BITMAP_LAYER
-static GBitmap *hour_bitmap;
-static GBitmap *min_bitmap;
-
-static RotBitmapLayer *hour_rot;
-static RotBitmapLayer *min_rot;
-#endif // ROT_BITMAP_LAYER
 
 
 int get_time(int unit) {
@@ -124,8 +116,7 @@ int get_time(int unit) {
 /********************************************************/
 
 
-//TO DO : 	Animation on app shutdown
-// 			Reverse startup_anim
+//TO DO :
 // 			Startup animation needs to move minute path too
 //			It doesn't
 
@@ -249,7 +240,7 @@ void setup_my_path_hour(int hour, int minute, GContext * ctx) {
 			
 		gpath_rotate_to(s_my_path_ptr_hour, animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B);
 		
-		test = (double)(0.104 * 0.000686 * (animation_startup_variable) / 6848);
+		test = (double)(SIN_6 * 0.000686 * (animation_startup_variable) / 6848);
 		
 		int move_sin = (double)(test * sin_lookup(animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B));		//round
 		int move_cos = (double)(test * cos_lookup(animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B));		//round
@@ -298,14 +289,14 @@ void setup_my_path_min(int minute, GContext * ctx) {
 		
 		if (animation_startup_flag == 1) {
 			gpath_rotate_to(s_my_path_ptr_min, animation_startup_variable + minute * 0x00444 );
-			test = (double)(0.105 * 0.000915 * animation_startup_variable / 6848);
+			test = (double)(SIN_6 * 0.000915 * animation_startup_variable / 6848);
 			
 			move_sin = (double)(test * sin_lookup(animation_startup_variable + minute * 0x00444 ));		//round
 			move_cos = (double)(test * cos_lookup(animation_startup_variable + minute * 0x00444));		//round
 		}
 		else {
 			gpath_rotate_to(s_my_path_ptr_min, animation_variable + minute * 0x00444 );
-			test = 6.272 / 6848;				// 45 * sin(1) / 6848
+			test = 6.272 / 6848;
 			move_sin = (double)(test * sin_lookup(animation_variable + minute * 0x00444 ));		//round
 			move_cos = (double)(test * cos_lookup(animation_variable + minute * 0x00444));		//round
 		}
@@ -345,9 +336,7 @@ static void outter_min_layer_update_callback(Layer *me, GContext *ctx) {
 
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000915 * animation_startup_variable);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "outter_min_startup_variable = %d, %d",animation_startup_variable, animation_on_startup_flag);
-#endif
+
 		graphics_fill_circle(ctx, p, test_value);
 	}
 	else if (animation_on_startup_flag == 0){
@@ -371,9 +360,6 @@ static void inner_min_layer_update_callback(Layer *me, GContext *ctx) {
 	
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000839 * animation_startup_variable);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "inner_min_startup_variable = %d, %d",animation_startup_variable, animation_on_startup_flag);
-#endif
 		graphics_fill_circle(ctx, p, test_value);
 	}
 	else if (animation_on_startup_flag == 0) {
@@ -391,9 +377,6 @@ static void outter_hour_layer_update_callback(Layer *me, GContext *ctx) {
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000687 * animation_startup_variable);
 		graphics_fill_circle(ctx, p, test_value);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "outter_hour_startup_variable = %d, %d", (int)test_value, animation_on_startup_flag);
-#endif
 	}
 	else if (animation_on_startup_flag == 0){
 		graphics_fill_circle(ctx, p, 45);
@@ -419,15 +402,10 @@ static void inner_hour_layer_update_callback(Layer *me, GContext *ctx) {
 		
 		double test_value = (double)(0.00061 * animation_startup_variable);
 		graphics_fill_circle(ctx, p, test_value);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "inner_hour_startup_variable = %d, %d", (int)test_value, animation_on_startup_flag);
-#endif
 	}
 	else if (animation_on_startup_flag == 0) {
 		graphics_fill_circle(ctx, p, 40);
 	}
-	
-	
 }
 /************************************************************/
 /************************************************************/
@@ -439,8 +417,9 @@ static void inner_hour_layer_update_callback(Layer *me, GContext *ctx) {
 /************************************************************/
 static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed) {
 	time_t now = time(NULL);
-	struct tm *t = localtime(&now);
+	
 #ifdef DEBUG
+	struct tm *t = localtime(&now);
 	APP_LOG(APP_LOG_LEVEL_INFO, "TEST = %d : %d : %d", t->tm_hour, t->tm_min, t->tm_sec);
 #endif
 	
@@ -449,13 +428,6 @@ static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed) {
 		animation_on_startup_flag = 0;
 	}
 	trigger_animation(ANIMATION_DURATION, 0);
-
-	
-#ifdef ROT_BITMAP_LAYER
-	rot_bitmap_layer_set_angle(hour_rot, (hour * 0x01555 + minute * 0x0005B));
-	rot_bitmap_layer_set_angle(min_rot, (minute * 0x00444));
-#endif // ROT_BITMAP_LAYER
-	
 }
 
 static void main_window_load(Window *window) {
@@ -474,43 +446,12 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_layer));
 	
 	
-	// Added by me
-	
-#ifdef ROT_BITMAP_LAYER
-	hour_bitmap = gbitmap_create_with_resource(RESOURCE_ID_HIDDING_IMAGE);
-	min_bitmap = gbitmap_create_with_resource(RESOURCE_ID_HIDDING_IMAGE);
-	//HIDDING_IMAGE
-	
-	// MINUTE ROT BITMAP LAYER DEFINITION
-	min_rot = rot_bitmap_layer_create(min_bitmap);
-	rot_bitmap_set_compositing_mode(min_rot, GCompOpAssign);
-	
-	layer_set_frame((Layer*)min_rot, GRect(72 - 60, 84 - 60, 12, 60));
-	rot_bitmap_layer_set_corner_clip_color(min_rot, GColorClear);
-	
-	// HOUR ROT BITMAP LAYER DEFINITION
-	hour_rot = rot_bitmap_layer_create(hour_bitmap);
-	rot_bitmap_set_compositing_mode(hour_rot, GCompOpAssign);
-	
-	layer_set_frame((Layer*)hour_rot, GRect(72 - 45, 84 - 45, 12, 46));
-	rot_bitmap_layer_set_corner_clip_color(hour_rot, GColorClear);
-	
-	GPoint center_min = {6, 61};
-	rot_bitmap_set_src_ic(min_rot, center_min);
-	
-#endif // ROT_BITMAP_LAYER
-	
 	outter_min_layer = layer_create(GRect(0, 0, 144, 168));
 	layer_add_child(text_layer_get_layer(s_time_layer), outter_min_layer);
 	layer_set_update_proc(outter_min_layer, outter_min_layer_update_callback);
 	
 	
-	
-#ifdef ROT_BITMAP_LAYER
-	layer_add_child(outter_min_layer, (Layer*)min_rot);
-#else
 	layer_add_child(text_layer_get_layer(s_time_layer), outter_min_layer);
-#endif
 	
 	
 	
@@ -524,23 +465,10 @@ static void main_window_load(Window *window) {
 	layer_set_update_proc(outter_hour_layer, outter_hour_layer_update_callback);
 	
 	
-	
-#ifdef ROT_BITMAP_LAYER
-	layer_add_child(outter_hour_layer, (Layer*)hour_rot);
-	
-	GPoint center_hour = {6, 46};
-	rot_bitmap_set_src_ic(hour_rot, center_hour);
-	
-	inner_hour_layer = layer_create(GRect(-27, -39, 144, 168));
-#else
 	inner_hour_layer = layer_create(GRect(0, 0, 144, 168));
-#endif
 	
-#ifdef ROT_BITMAP_LAYER
-	layer_add_child((Layer*)hour_rot, inner_hour_layer);
-#else
 	layer_add_child(outter_hour_layer, inner_hour_layer);
-#endif
+
 	layer_set_update_proc(inner_hour_layer, inner_hour_layer_update_callback);
 	
 	
@@ -556,12 +484,6 @@ static void main_window_unload(Window *window) {
 	layer_destroy(inner_hour_layer);
 	layer_destroy(outter_min_layer);
 	layer_destroy(inner_min_layer);
-#ifdef ROT_BITMAP_LAYER
-	rot_bitmap_layer_destroy(hour_rot);
-	rot_bitmap_layer_destroy(min_rot);
-	gbitmap_destroy(min_bitmap);
-	gbitmap_destroy(hour_bitmap);
-#endif
 }
 
 static void init() {
