@@ -11,43 +11,27 @@
 /* 							2.9 SDK										*/
 /************************************************************************/
 
-// Test with scode
 
 
 // TODO :
 //			Get rid of the text layer (App crashes without it ?)
 // 			Animations (Almost done)
-// 			Color selection (Settings with js)
-// 			MACRO for aplite and basalt : Done
+// 			Settings with js
 //			Define constants for easier changes in the config.h file
 //				All values must be replaced by a const in the code
-//		IMPORTANT
-//			Take care of the rotation issue during the animation !!
-//			This is fucking ugly now that the animation is slower
-//
-//			Take care of the first image that shouldn't be here (before animation_startup ends)
-
-//		It might come from the value of the angle.
-//		To test this out, I should draw another GPath in the middle and rotate it with different values.
 
 /*
  Animations :
  
  On Startup
  __________
- Both circles will grow from the middle, swirling once
+ Both circles will grow from the middle, minutes swirling once and hours swirling twice
  Angle should stay the same but radius should be modified by animation_startup_variable...
- 
- Another problem : The watch should not display the circles until the end of the animation.
  
  
  On Time change
  ______________
  Minute Circle swirls once
- Problem : The GPah doesn't rotate( around its center) well...
- Need : Recalculate the rotation angle.
- 
- Kind of like the interface of the pebble timeline
  
  
  On Shutdown
@@ -60,7 +44,6 @@ Nothing like that can be done in the deinit process...
 
 
 #include <pebble.h>
-//#include "color_definition.h"
 #include "config.h"
 
 
@@ -117,9 +100,6 @@ int get_time(int unit) {
 /********************************************************/
 
 
-//TO DO :
-// 			Startup animation needs to move minute path too
-//			It doesn't
 
 static Animation* anim;
 static Animation* startup_anim;
@@ -239,12 +219,12 @@ void setup_my_path_hour(int hour, int minute, GContext * ctx) {
 	
 	if (animation_startup_flag == 1) {
 			
-		gpath_rotate_to(s_my_path_ptr_hour, animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B);
+		gpath_rotate_to(s_my_path_ptr_hour, animation_startup_variable * 2 + hour *  HOUR_ANGLE + minute * 0x0005B);
 		
 		test = (double)(SIN_6 * 0.000686 * (animation_startup_variable) / 6848);
 		
-		int move_sin = (double)(test * sin_lookup(animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B));		//round
-		int move_cos = (double)(test * cos_lookup(animation_startup_variable * 2 + hour *  0x01555 + minute * 0x0005B));		//round
+		int move_sin = (double)(test * sin_lookup(animation_startup_variable * 2 + hour *  HOUR_ANGLE + minute * 0x0005B));		//round
+		int move_cos = (double)(test * cos_lookup(animation_startup_variable * 2 + hour *  HOUR_ANGLE + minute * 0x0005B));		//round
 		
 		gpath_move_to(s_my_path_ptr_hour, GPoint(72 + move_sin, 84 - move_cos));
 		// Fill the path:
@@ -252,12 +232,12 @@ void setup_my_path_hour(int hour, int minute, GContext * ctx) {
 		gpath_draw_filled(ctx, s_my_path_ptr_hour);
 	}
 	else {
-		gpath_rotate_to(s_my_path_ptr_hour, hour *  0x01555 + minute * 0x0005B);
+		gpath_rotate_to(s_my_path_ptr_hour, hour *  HOUR_ANGLE + minute * 0x0005B);
 		
 		test = 4.704 / 6848;										// 45 * sin(1) / 6848
 		
-		int move_sin = (double)(test * sin_lookup(hour *  0x01555 + minute * 0x0005B));		//round
-		int move_cos = (double)(test * cos_lookup(hour *  0x01555 + minute * 0x0005B));		//round
+		int move_sin = (double)(test * sin_lookup(hour *  HOUR_ANGLE + minute * 0x0005B));		//round
+		int move_cos = (double)(test * cos_lookup(hour *  HOUR_ANGLE + minute * 0x0005B));		//round
 		
 		gpath_move_to(s_my_path_ptr_hour, GPoint(72 + move_sin, 84 - move_cos));
 		// Fill the path:
