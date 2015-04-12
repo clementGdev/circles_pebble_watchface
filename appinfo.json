@@ -13,16 +13,6 @@
                 "menuIcon": true,
                 "name": "IMAGE_MENU_ICON",
                 "type": "png"
-            },
-            {
-                "file": "images/hidding_image.png",
-                "name": "HIDDING_IMAGE",
-                "type": "png"
-            },
-            {
-                "file": "images/hidding_image - Copy.png",
-                "name": "IMAGE_TEST",
-                "type": "png"
             }
         ]
     },
