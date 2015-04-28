@@ -1,7 +1,10 @@
 {
-    "appKeys": {},
+    "appKeys": {
+        "KEY_BACKGROUND_COLOR": 20,
+        "KEY_CIRCLES_COLOR": 21
+    },
     "capabilities": [
-        ""
+        "configurable"
     ],
     "companyName": "clementgix",
     "longName": "CIRCLES",

@@ -17,8 +17,13 @@
 // TODO :
 //			Get rid of the text layer (App crashes without it ?)
 // 			Animations (Almost done)
-// 			Color selection (Settings with js)
-// 			MACRO for aplite and basalt : Done
+
+// 			Color selection (Settings with js) : DONE
+
+// 			MACRO for aplite and basalt : DONE
+
+//			COMMENT the code :
+
 //			Define constants for easier changes in the config.h file
 //				All values must be replaced by a const in the code
 //		IMPORTANT
@@ -59,50 +64,54 @@
 
 //////////////////////////////////////////////////////////////
 
-
+/**********		I N C L U D E S		**********/
 #include <pebble.h>
+#include "CIRCLES_local.h"
 #include "color_definition.h"
 #include "config.h"
+//////////////////////////////////////////
 
-	
-#define KEY_BACKGROUND_COLOR 	20
-#define KEY_CIRCLES_COLOR 		21
 
+
+/***********	L A Y E R   D E F I N I T I O N		**********/
 static Window *s_main_window;
 
 static TextLayer *s_time_layer;
+
+static Layer *background_layer;
 
 static Layer *outter_hour_layer;
 static Layer *inner_hour_layer;
 
 static Layer *outter_min_layer;
 static Layer *inner_min_layer;
+//////////////////////////////////////////////////////////////////
 
 
-/********************************************************/
-/*					HARDWARE SUPPORT					*/
-/********************************************************/
+
+/**********		H A R D W A R E   S U P P O R T		**********/
 #ifdef PBL_COLOR
-static GColor back_color = (GColor) GColorBlueMoonARGB8;
-static GColor circle_color = (GColor) GColorWhiteARGB8;
+static GColor back_color = (GColor) GColorBlackARGB8;
+static GColor circle_color = (GColor) GColorRedARGB8;
 #else
 static GColor back_color = GColorBlack;
 static GColor circle_color = GColorWhite;
 #endif
-/********************************************************/
-/********************************************************/
+//////////////////////////////////////////////////////////////
+	
 
+/**********		G P A T H S   D E F I N I T I O N		**********/
 static GPath *s_my_path_ptr_hour = NULL;
 static GPath *s_my_path_ptr_min = NULL;
 
-
-static const GPathInfo BOLT_PATH_INFO = {
+static const GPathInfo NEEDLE_PATH_INFO = {
 	.num_points = 4,
 	.points = (GPoint []) {{-7, -7}, {7, -7}, {7, 7} , {-7, 7}}
 };
+//////////////////////////////////////////////////////////////////
 
 
-
+/**********		G E T   T I M E		**********/
 int get_time(int unit) {
 	time_t now = time(NULL);
 	struct tm * t = localtime(&now);
@@ -121,31 +130,29 @@ int get_time(int unit) {
 			return 0;
 	}
 }
+////////////////////////////////////////////////
 
 
-#ifdef ANIMATION
-/********************************************************/
-/*						ANIMATIONS 						*/
-/********************************************************/
 
 
 //TO DO :
-// 			Startup animation needs to move minute path too
-//			It doesn't
+// 			Debugging : Reverse anim and anim...	
 
-// Debugging : Reverse anim and anim...	
-	
-static Animation* anim;
-static Animation* startup_anim;
-static Animation* shutdown_anim;
+/**********		A N I M A T I O N S   D E F I N I T I O N		**********/
+#ifdef ANIMATION
+	static Animation* anim;
+	static Animation* startup_anim;
+	//static Animation* shutdown_anim;
+	static int animation_flag = 0;
+	static int animation_on_startup_flag = 1;
+	static int animation_startup_flag = 0;
+	static int animation_variable = 0;
+	static int animation_startup_variable = 0;
+////////////////////////////////////////////////////////////////////////////
 
-static int animation_flag = 0;
-static int animation_on_startup_flag = 1;
-static int animation_startup_flag = 0;
 
-static int animation_variable = 0;
-static int animation_startup_variable = 0;
-
+/**********		A N I M A T I O N S   I M P L E M E N T A T I O N		**********/
+// M I N U T E   C H A N G E
 void update_implementation (Animation *animation, const uint32_t distance_normalized) {
 	
 	animation_variable = (int)distance_normalized;
@@ -159,8 +166,26 @@ const AnimationImplementation anim_implementation = {
 	.update = (AnimationUpdateImplementation) update_implementation,
 };
 
+// S T A R T U P
+void update_startup_implementation (Animation *animation, const uint32_t distance_normalized) {
 
-// ANIMATION DESTROY
+	animation_startup_variable = (int)distance_normalized;
+	animation_startup_flag = 1;
+	
+	layer_mark_dirty(outter_min_layer);
+	
+	return;
+}
+
+const AnimationImplementation anim_startup_implementation = {
+	.update = (AnimationUpdateImplementation) update_startup_implementation,
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+/********		A N I M A T I O N S   S T O P P E D		**********/
+// M I N U T E   C H A N G E
 void on_animation_stop(Animation * animation, bool finished, void *ctx) {
 	animation_flag = 0;
 	layer_mark_dirty(outter_hour_layer);
@@ -171,6 +196,34 @@ void on_animation_stop(Animation * animation, bool finished, void *ctx) {
 	
 }
 
+// S T A R T U P
+void on_animation_startup_stop(Animation * animation, bool finished, void *ctx) {
+	animation_on_startup_flag = 0;
+	animation_startup_flag = 0;
+	layer_mark_dirty(outter_min_layer);		// Re render all the layers
+
+#ifdef PBL_PLATFORM_APLITE
+	animation_destroy(animation);
+#endif
+	
+}
+
+// S H U T D O W N
+void on_animation_shutdown_stop(Animation * animation, bool finished, void *ctx) {
+	animation_on_startup_flag = 0;
+	animation_startup_flag = 0;
+	layer_mark_dirty(outter_min_layer);		// Re render all the layers
+
+	trigger_startup_animation(ANIMATION_DURATION, 0);
+#ifdef PBL_PLATFORM_APLITE
+	animation_destroy(animation);
+#endif
+}
+/////////////////////////////////////////////////////////////////////
+
+
+/**********		A N I M A T I O N S   T R I G G E R		**********/
+// M I N U T E   C H A N G E
 void trigger_animation (int duration, int delay) {
 	anim = animation_create();
 	animation_set_duration((Animation*) anim, duration);
@@ -189,45 +242,7 @@ void trigger_animation (int duration, int delay) {
 	
 }
 
-
-
-////////////////////////////////////////////////////////////////
-
-
-void update_startup_implementation (Animation *animation, const uint32_t distance_normalized) {
-
-	animation_startup_variable = (int)distance_normalized;
-	animation_startup_flag = 1;
-	
-	layer_mark_dirty(outter_min_layer);
-	
-	return;
-}
-
-const AnimationImplementation anim_startup_implementation = {
-	.update = (AnimationUpdateImplementation) update_startup_implementation,
-};
-
-
-
-// ANIMATION DESTROY
-void on_animation_startup_stop(Animation * animation, bool finished, void *ctx) {
-	animation_on_startup_flag = 0;
-	animation_startup_flag = 0;
-	APP_LOG(APP_LOG_LEVEL_INFO, "Animation stopped");
-	layer_mark_dirty(outter_min_layer);		// Re render all the layers
-	
-	/* ANIMATION_DESTROY MAKES THE APP CRASH ON BASALT... */
-	/* It works without it but it's not very safe for the memory */
-	// Actually, on the basalt platform, the Pebble_OS frees the memory on its own
-	// No need to call animation_destroy on Basalt
-#ifdef PBL_PLATFORM_APLITE
-	animation_destroy(animation);
-#endif
-	
-}
-
-
+// S T A R T U P
 void trigger_startup_animation (int duration, int delay) {
 	startup_anim = animation_create();
 	
@@ -247,31 +262,10 @@ void trigger_startup_animation (int duration, int delay) {
 	
 }
 
-////////////////////////////////////////////////////////////
-
-// ANIMATION DESTROY
-void on_animation_shutdown_stop(Animation * animation, bool finished, void *ctx) {
-	animation_on_startup_flag = 0;
-	animation_startup_flag = 0;
-	APP_LOG(APP_LOG_LEVEL_INFO, "Animation stopped");
-	layer_mark_dirty(outter_min_layer);		// Re render all the layers
-	
-	/* ANIMATION_DESTROY MAKES THE APP CRASH ON BASALT... */
-	/* It works without it but it's not very safe for the memory */
-	// Actually, on the basalt platform, the Pebble_OS frees the memory on its own
-	// No need to call animation_destroy on Basalt
-	trigger_startup_animation(ANIMATION_DURATION, 0);
-	//trigger_animation(ANIMATION_DURATION, 0);
-#ifdef PBL_PLATFORM_APLITE
-	animation_destroy(animation);
-#endif
-	
-}
-
-
+// S H U T D O W N
+/*
 #ifdef PBL_PLATFORM_BASALT
 void trigger_shutdown_animation (int duration, int delay) {
-	APP_LOG(APP_LOG_LEVEL_INFO, "Animation triggered");
 	shutdown_anim = animation_create();
 	
 	animation_set_duration((Animation*) shutdown_anim, duration);
@@ -285,28 +279,24 @@ void trigger_shutdown_animation (int duration, int delay) {
 	animation_set_handlers (shutdown_anim, startup_anim_handlers, NULL);
 	
 	animation_set_implementation(shutdown_anim, &anim_startup_implementation);
-	
-	APP_LOG(APP_LOG_LEVEL_INFO, "Animation reversed");
 	animation_set_reverse(shutdown_anim, true);
-
-	APP_LOG(APP_LOG_LEVEL_INFO, "Scheduling animation");
 	animation_schedule((Animation *) shutdown_anim);
-	APP_LOG(APP_LOG_LEVEL_INFO, "Animation scheduled");
-	
 }
 #endif
-
+*/
+//////////////////////////////////////////////////////////////////
 #endif	// ANIMATIONS
+////////////////////////////////////////////////////////////
 
-/********************************************************/
-/*						HOUR PATH					*/
-/********************************************************/
+
+
+/**********		H O U R   P A T H		**********/
 void setup_my_path_hour(int hour, int minute, GContext * ctx) {
 	
 	double test;
 	
 	gpath_destroy(s_my_path_ptr_hour);
-	s_my_path_ptr_hour = gpath_create(&BOLT_PATH_INFO);
+	s_my_path_ptr_hour = gpath_create(&NEEDLE_PATH_INFO);
 	
 	if (animation_startup_flag == 1) {
 		
@@ -337,14 +327,10 @@ void setup_my_path_hour(int hour, int minute, GContext * ctx) {
 	}
 	
 }
-/********************************************************/
-/********************************************************/
+//////////////////////////////////////////////////////////
 
 
-
-/********************************************************/
-/*						MINUTE PATH						*/
-/********************************************************/
+/**********		M I N U T E   P A T H		**********/
 void setup_my_path_min(int minute, GContext * ctx) {
 	double test;
 	int move_sin;
@@ -356,7 +342,7 @@ void setup_my_path_min(int minute, GContext * ctx) {
 		// Animation routine
 		
 		
-		s_my_path_ptr_min = gpath_create(&BOLT_PATH_INFO);
+		s_my_path_ptr_min = gpath_create(&NEEDLE_PATH_INFO);
 		
 		if (animation_startup_flag == 1) {
 			gpath_rotate_to(s_my_path_ptr_min, animation_startup_variable + minute * 0x00444 );
@@ -378,7 +364,7 @@ void setup_my_path_min(int minute, GContext * ctx) {
 		gpath_draw_filled(ctx, s_my_path_ptr_min);
 	}
 	else {
-		s_my_path_ptr_min = gpath_create(&BOLT_PATH_INFO);
+		s_my_path_ptr_min = gpath_create(&NEEDLE_PATH_INFO);
 		
 		gpath_rotate_to(s_my_path_ptr_min, TRIG_MAX_ANGLE / 360 * minute * 6);
 		
@@ -393,23 +379,23 @@ void setup_my_path_min(int minute, GContext * ctx) {
 		gpath_draw_filled(ctx, s_my_path_ptr_min);
 	}
 }
-/********************************************************/
-/********************************************************/
+///////////////////////////////////////////////////////////
 
 
+/**********		L A Y E R   U P D A T E		**********/
+// B A C K G R O U N D
+static void background_layer_update_callback(Layer* me, GContext* ctx) {
+	graphics_context_set_fill_color(ctx, back_color);
+	graphics_fill_rect(ctx, GRect(0,0,144, 168), 0, GCornerNone);
+}
 
-/************************************************************/
-/*						CIRCLES SETUP						*/
-/************************************************************/
+// O U T T E R   M I N U T E S
 static void outter_min_layer_update_callback(Layer *me, GContext *ctx) {
 	GPoint p = {72, 84};
 	graphics_context_set_fill_color(ctx, circle_color);
 	
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000915 * animation_startup_variable);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "outter_min_startup_variable = %d, %d",animation_startup_variable, animation_on_startup_flag);
-#endif
 		graphics_fill_circle(ctx, p, test_value);
 	}
 	else if (animation_on_startup_flag == 0){
@@ -425,6 +411,7 @@ static void outter_min_layer_update_callback(Layer *me, GContext *ctx) {
 	
 }
 
+// I N N E R   M I N U T E S
 static void inner_min_layer_update_callback(Layer *me, GContext *ctx) {
 	GPoint p = {72, 84};
 	
@@ -432,9 +419,6 @@ static void inner_min_layer_update_callback(Layer *me, GContext *ctx) {
 	
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000839 * animation_startup_variable);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "inner_min_startup_variable = %d, %d",animation_startup_variable, animation_on_startup_flag);
-#endif
 		graphics_fill_circle(ctx, p, test_value);
 	}
 	else if (animation_on_startup_flag == 0) {
@@ -442,6 +426,7 @@ static void inner_min_layer_update_callback(Layer *me, GContext *ctx) {
 	}
 }
 
+// O U T T E R   H O U R S
 static void outter_hour_layer_update_callback(Layer *me, GContext *ctx) {
 	GPoint p = {72, 84};
 	
@@ -450,9 +435,6 @@ static void outter_hour_layer_update_callback(Layer *me, GContext *ctx) {
 	if (animation_startup_flag == 1) {
 		double test_value = (double)(0.000687 * animation_startup_variable);
 		graphics_fill_circle(ctx, p, test_value);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "outter_hour_startup_variable = %d, %d", (int)test_value, animation_on_startup_flag);
-#endif
 	}
 	else if (animation_on_startup_flag == 0){
 		graphics_fill_circle(ctx, p, 45);
@@ -469,6 +451,7 @@ static void outter_hour_layer_update_callback(Layer *me, GContext *ctx) {
 	setup_my_path_hour(hour, minute, ctx);
 }
 
+// I N N E R   H O U R S
 static void inner_hour_layer_update_callback(Layer *me, GContext *ctx) {
 	GPoint p = {72, 84};
 	
@@ -477,44 +460,34 @@ static void inner_hour_layer_update_callback(Layer *me, GContext *ctx) {
 		
 		double test_value = (double)(0.00061 * animation_startup_variable);
 		graphics_fill_circle(ctx, p, test_value);
-#ifdef DEBUG
-		//APP_LOG(APP_LOG_LEVEL_INFO, "inner_hour_startup_variable = %d, %d", (int)test_value, animation_on_startup_flag);
-#endif
 	}
 	else if (animation_on_startup_flag == 0) {
 		graphics_fill_circle(ctx, p, 40);
 	}
 	
 }
-/************************************************************/
-/************************************************************/
+////////////////////////////////////////////////////////////////////
 
 
-
-/************************************************************/
-/*						TICK HANDLER						*/
-/************************************************************/
+/**********		T I C K   H A N D L E R		**********/
 static void handle_minute_tick(struct tm* tick_time, TimeUnits units_changed) {
 	time_t now = time(NULL);
+	
+#ifdef DEBUG
 	struct tm *t = localtime(&now);
-//#ifdef DEBUG
 	APP_LOG(APP_LOG_LEVEL_INFO, "TEST = %d : %d : %d", t->tm_hour, t->tm_min, t->tm_sec);
-//#endif
+#endif
 	
 	if (animation_on_startup_flag == 1) {
 		trigger_startup_animation(STARTUP_DURATION, 0);
 		animation_on_startup_flag = 0;
 	}
-	
-#ifdef PBL_PLATFORM_BASALT
-	//trigger_shutdown_animation(ANIMATION_DURATION, 0);
-#endif
-	//trigger_startup_animation(ANIMATION_DURATION, 0);
+
 	trigger_animation(ANIMATION_DURATION, 0);
 	
 }
 
-// CONFIGURATION COMMUNICATION
+/**********	C O M M U N I C A T I O N   C O N F I G U R A T I O N		**********/ 
 static void in_recv_handler(DictionaryIterator *iterator, void *context)
 {
 	//Get Tuple
@@ -523,42 +496,108 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
 	while(t)
 	{
 		switch(t->key)
-		{
+		{		// Replace ifs by switch case:
 			case KEY_BACKGROUND_COLOR:
-				//It's the KEY_INVERT key
-				if(strcmp(t->value->cstring, "blue") == 0)
-				{
-					#ifdef PBL_COLOR
-						back_color = (GColor) GColorBlueMoonARGB8;
-						circle_color = (GColor) GColorWhiteARGB8;
-					#endif
+				//It's the KEY_BACKGROUND_COLOR key
+				if(strcmp(t->value->cstring, "black") == 0) {
+					back_color = (GColor) GColorBlack;
+					layer_mark_dirty(window_get_root_layer(s_main_window));
 					persist_write_int(KEY_BACKGROUND_COLOR, 1);
 				}
-				else if(strcmp(t->value->cstring, "green") == 0)
-				{
+				else if(strcmp(t->value->cstring, "white") == 0) {
+					back_color = (GColor) GColorWhite;
+					layer_mark_dirty(window_get_root_layer(s_main_window));
+					persist_write_int(KEY_BACKGROUND_COLOR, 2);
+				}
+				else if(strcmp(t->value->cstring, "blue") == 0) {
 					#ifdef PBL_COLOR
-						back_color = (GColor) GColorJaegerGreenARGB8;
-						circle_color = (GColor) GColorWhiteARGB8;
+						back_color = (GColor) GColorBlueARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_BACKGROUND_COLOR, 3);
+				}
+				else if(strcmp(t->value->cstring, "red") == 0) {
+					#ifdef PBL_COLOR
+						back_color = (GColor) GColorRedARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_BACKGROUND_COLOR, 4);
+				}
+				else if(strcmp(t->value->cstring, "green") == 0) {
+					#ifdef PBL_COLOR
+						back_color = (GColor) GColorGreenARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
 					#endif
 
-					persist_write_int(KEY_BACKGROUND_COLOR, 2);
+					persist_write_int(KEY_BACKGROUND_COLOR, 5);
+				}
+				else if(strcmp(t->value->cstring, "pink") == 0) {
+					#ifdef PBL_COLOR
+						back_color = (GColor) GColorFashionMagentaARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+
+					persist_write_int(KEY_BACKGROUND_COLOR, 6);
+				}
+				else if(strcmp(t->value->cstring, "yellow") == 0) {
+					#ifdef PBL_COLOR
+						back_color = (GColor) GColorYellowARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));;
+					#endif
+
+					persist_write_int(KEY_BACKGROUND_COLOR, 7);
 				}
 				
 				break;
+			
+			
+			
 			case KEY_CIRCLES_COLOR:
-				//It's the KEY_BATTERY key
-				if(strcmp(t->value->cstring, "on") == 0)
-				{
-
+				//It's the KEY_CIRCLE_COLOR key
+				if(strcmp(t->value->cstring, "black") == 0) {
+					circle_color = (GColor) GColorBlack;
+					layer_mark_dirty(window_get_root_layer(s_main_window));
+					persist_write_int(KEY_CIRCLES_COLOR, 1);
 				}
-				else if(strcmp(t->value->cstring, "low") == 0)
-				{
-
+				else if(strcmp(t->value->cstring, "white") == 0) {
+					circle_color = (GColor) GColorWhite;
+					layer_mark_dirty(window_get_root_layer(s_main_window));
+					persist_write_int(KEY_CIRCLES_COLOR, 2);
 				}
-				
-				else if(strcmp(t->value->cstring, "off") == 0)
-				{
-
+				else if(strcmp(t->value->cstring, "blue") == 0) {
+					#ifdef PBL_COLOR
+						circle_color = (GColor) GColorBlueARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_CIRCLES_COLOR, 3);
+				}
+				else if(strcmp(t->value->cstring, "red") == 0) {
+					#ifdef PBL_COLOR
+						circle_color = (GColor) GColorRedARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_CIRCLES_COLOR, 4);
+				}
+				else if(strcmp(t->value->cstring, "green") == 0) {
+					#ifdef PBL_COLOR
+						circle_color = (GColor) GColorGreenARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_CIRCLES_COLOR, 5);
+				}
+				else if(strcmp(t->value->cstring, "pink") == 0) {
+					#ifdef PBL_COLOR
+						circle_color = (GColor) GColorFashionMagentaARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_CIRCLES_COLOR, 6);
+				}
+				else if(strcmp(t->value->cstring, "yellow") == 0) {
+					#ifdef PBL_COLOR
+						circle_color = (GColor) GColorYellowARGB8;
+						layer_mark_dirty(window_get_root_layer(s_main_window));
+					#endif
+					persist_write_int(KEY_CIRCLES_COLOR, 7);
 				}
 				break;
 
@@ -566,10 +605,13 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
 		t = dict_read_next(iterator);
 	}
 }
+/////////////////////////////////////////////////////////////////////////////////////////////
 
+
+/**********		W I N D O W   L O A D		**********/
 static void main_window_load(Window *window) {
+	
 	// Create time TextLayer
-	APP_LOG(APP_LOG_LEVEL_INFO, "Window_load");
 	s_time_layer = text_layer_create(GRect(0, 0, 144, 168));
 	text_layer_set_background_color(s_time_layer, back_color);
 	text_layer_set_text_color(s_time_layer, GColorClear);
@@ -584,11 +626,14 @@ static void main_window_load(Window *window) {
 	
 	// Added by me
 	
+	background_layer = layer_create(GRect(0, 0, 144, 168));
+	layer_add_child(text_layer_get_layer(s_time_layer), background_layer);
+	layer_set_update_proc(background_layer, background_layer_update_callback);
+	
 	outter_min_layer = layer_create(GRect(0, 0, 144, 168));
-	layer_add_child(text_layer_get_layer(s_time_layer), outter_min_layer);
+	layer_add_child(background_layer, outter_min_layer);
 	layer_set_update_proc(outter_min_layer, outter_min_layer_update_callback);
 	
-	layer_add_child(text_layer_get_layer(s_time_layer), outter_min_layer);
 
 	inner_min_layer = layer_create(GRect(0, 0, 144, 168));
 	layer_add_child(outter_min_layer, inner_min_layer);
@@ -605,16 +650,12 @@ static void main_window_load(Window *window) {
 	layer_set_update_proc(inner_hour_layer, inner_hour_layer_update_callback);
 	
 }
+//////////////////////////////////////////////////////////////////
 
+
+/**********		W I N D O W   U N L O A D		**********/
 static void main_window_unload(Window *window) {
 	// Destroy TextLayer
-	APP_LOG(APP_LOG_LEVEL_INFO, "Window_unload");
-	//animation_set_reverse(startup_anim, true);
-#ifdef PBL_PLATFORM_BASALT
-	APP_LOG(APP_LOG_LEVEL_INFO, "Triggering animation");
-	trigger_shutdown_animation(100, 0);
-#endif
-	APP_LOG(APP_LOG_LEVEL_INFO, "Destroying everything");
 	window_stack_remove(s_main_window, true);
 	gpath_destroy(s_my_path_ptr_hour);
 	gpath_destroy(s_my_path_ptr_min);
@@ -623,10 +664,81 @@ static void main_window_unload(Window *window) {
 	layer_destroy(inner_hour_layer);
 	layer_destroy(outter_min_layer);
 	layer_destroy(inner_min_layer);
+	layer_destroy(background_layer);
 
 }
+////////////////////////////////////////////////////
 
+
+/**********		I N I T		**********/
 static void init() {
+	// READ THE PERSISTANT DATA
+	switch (persist_read_int(KEY_BACKGROUND_COLOR)) {
+		case 1:	// Black
+			back_color = GColorBlack;
+			break;
+		case 2:	// White
+			back_color = GColorWhite;
+			break;
+		#ifdef PBL_COLOR
+			case 3:	// Blue
+				back_color = (GColor) GColorBlueARGB8;
+				break;
+			case 4:	// Red
+				back_color = (GColor) GColorRedARGB8;
+				break;
+			case 5:	// Green
+				back_color = (GColor) GColorGreenARGB8;
+				break;
+			case 6:	// Pink
+				back_color = (GColor) GColorFashionMagentaARGB8;
+				break;
+			case 7:	// Yellow
+				back_color = (GColor) GColorYellowARGB8;
+				break;
+			default:	// Black By Default
+			back_color = (GColor) GColorBlack;
+			break;
+		#else
+			default:	// Black By Default
+				back_color = (GColor) GColorBlack;
+				break;
+		#endif
+	}
+	
+	switch (persist_read_int(KEY_CIRCLES_COLOR)) {
+		case 1:	// White
+			circle_color = GColorWhite;
+			break;
+		case 2:	// Black
+			circle_color = GColorBlack;
+			break;
+		#ifdef PBL_COLOR
+			case 3:	// Blue
+				circle_color = (GColor) GColorBlueARGB8;
+				break;
+			case 4:	// Red
+				circle_color = (GColor) GColorRedARGB8;
+				break;
+			case 5:	// Green
+				circle_color = (GColor) GColorGreenARGB8;
+				break;
+			case 6:	// Pink
+				circle_color = (GColor) GColorFashionMagentaARGB8;
+				break;
+			case 7:	// Yellow
+				circle_color = (GColor) GColorYellowARGB8;
+				break;
+			default:	// Red By Default
+				circle_color = (GColor) GColorRedARGB8;
+				break;
+		#else
+			default:	// White By Default
+				circle_color = (GColor) GColorWhiteARGB8;
+				break;
+		#endif
+	}
+	
 	// Create main Window element and assign to pointer
 	s_main_window = window_create();
 	
@@ -648,17 +760,27 @@ static void init() {
 #endif
 	
 	tick_timer_service_subscribe(unit, &handle_minute_tick);
-}
+	
+	app_message_register_inbox_received((AppMessageInboxReceived) in_recv_handler);
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 
+}
+///////////////////////////////////////////////////////
+
+
+/**********		D E I N I T		**********/
 static void deinit() {
-	APP_LOG(APP_LOG_LEVEL_INFO, "Deinit here");
 	tick_timer_service_unsubscribe();
 	// Destroy Window
 	window_destroy(s_main_window);
 }
+//////////////////////////////////////////
 
+
+/**********		M A I N		**********/
 int main(void) {
 	init();
 	app_event_loop();
 	deinit();
 }
+///////////////////////////////////////
